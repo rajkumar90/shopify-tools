@@ -1,0 +1,21 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+- Let's build a script for website scraping
+- Given a website, scrape all product information and append to the csv file(under `app/resources/`)
+- This doc has info on Shopify CSV import: https://help.shopify.com/en/manual/products/import-export/using-csv#adding-multiple-product-images
+- CSV filename
+  - Let's have this as <brand_name>.csv
+  - Create a new one if file doesn't exist. Append if it exists
+- SKU name: AbbreviatedBrand-AbbreviatedProduct
+    - If brand name is `The divine foods` and product name is `Ulutham Kanji`, SKU name is `TDK-UK`
+- Price (in INR):
+    - profit_margin_percent = 40
+    - customs = 0
+    - original_price = scraped price
+    - listing_price = original_price + weight_in_kgs * shipping_price_per_kg
+						 + customs 
+						 + original_price * (profit_margin_percent / 100)
+
