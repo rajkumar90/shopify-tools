@@ -3,19 +3,93 @@ description:
 globs: 
 alwaysApply: false
 ---
-- Let's build a script for website scraping
-- Given a website, scrape all product information and append to the csv file(under `app/resources/`)
+## Goal
+Let's build a script for scraping product data from a Shopify website, and adding them to a CSV
+
+## Input
+- Input will be a URL like `site/products.json` (For example: `https://www.thedivinefoods.com/collections/best-sellers/products.json?limit=50`)
+- The product data will be in a json format, and the goal is to convert in into a csv for uploading to Shopify
 - This doc has info on Shopify CSV import: https://help.shopify.com/en/manual/products/import-export/using-csv#adding-multiple-product-images
-- CSV filename
-  - Let's have this as <brand_name>.csv
+- Use `app/resources/product_template.csv` as the reference template 
+
+## CSV filename and format
+  - Let's create the output file as `app/resources/products/<brand_name>.csv`
   - Create a new one if file doesn't exist. Append if it exists
+  - Use `app/resources/product_template.csv` as the reference template - Duplicate this for new csv files
+### Brand name
+    - `handle` field in `app/helpers/brand.rb`
 - SKU name: AbbreviatedBrand-AbbreviatedProduct
-    - If brand name is `The divine foods` and product name is `Ulutham Kanji`, SKU name is `TDK-UK`
-- Price (in INR):
+    - If brand name is `The divine foods` and product name is `Ulutham Kanji`, SKU name is `TDF-UK` (Use hyphen, not underscore)
+- Price calculation(in INR):
+    - Do not use the price in the website in the csv. Use the below logic to calculate the listing price 
     - profit_margin_percent = 40
     - customs = 0
+    - shipping_price_per_kg = 1800
     - original_price = scraped price
     - listing_price = original_price + weight_in_kgs * shipping_price_per_kg
 						 + customs 
 						 + original_price * (profit_margin_percent / 100)
 
+# Shopify JSON to CSV Mapping
+## Direct Mappings (JSON → CSV)
+
+**Handle** → `products[].handle` - Direct mapping
+**Title** → `products[].title` - Direct mapping  
+**Body (HTML)** → `products[].body_html` - Contains escaped HTML, needs unescaping
+**Vendor** → Don't populate
+**Type** → `products[].product_type` - Direct mapping
+**Tags** → `products[].tags` - Add just one tag (`BRANDS[].tag` in @brand.rb)
+**Published** → `products[].published_at` - Always populate as false
+**Option1 Name** → `products[].options[0].name` - First option name
+**Option1 Value** → `products[].variants[].option1` - From variant data
+**Option2 Name** → `products[].options[1].name` - Second option name (if exists)
+**Option2 Value** → `products[].variants[].option2` - From variant data
+**Option3 Name** → `products[].options[2].name` - Third option name (if exists)
+**Option3 Value** → `products[].variants[].option3` - From variant data
+**Variant SKU** → `products[].variants[].sku` - Direct mapping
+**Variant Grams** → `products[].variants[].grams` - Direct mapping
+**Variant Price** → `products[].variants[].price`
+    - profit_margin_percent = 40
+    - customs = 0
+    - shipping_price_per_kg = 1800 INR
+    - original_price = `products[].variants[].price`
+    - listing_price = original_price + weight_in_kgs * shipping_price_per_kg
+						 + customs 
+**Variant Compare At Price** → `products[].variants[].compare_at_price` - Direct mapping
+**Variant Requires Shipping** → `products[].variants[].requires_shipping` - Convert boolean to TRUE/FALSE
+**Variant Taxable** → `products[].variants[].taxable` - Convert boolean to TRUE/FALSE
+**Image Src** → `products[].images[0].src` - First image URL
+**Image Position** → `products[].images[0].position` - First image position
+
+## Calculated/Static Mappings
+
+**Product Category** → Static value - Need to categorize based on product type
+**Variant Inventory Tracker** → `"shopify"` - Static default
+**Variant Inventory Qty** → 0
+**Variant Inventory Policy** → `"deny"` - Static default
+**Variant Fulfillment Service** → `"manual"` - Static default
+**Variant Barcode** → Empty or generated - Not in JSON
+**Image Alt Text** → `products[].title` - Use product title
+**Gift Card** → `FALSE` - Static
+**SEO Title** → `products[].title` - Use product title
+**SEO Description** → Extract from `body_html` - Strip HTML, truncate
+**Variant Weight Unit** → `"g"` - Based on grams field
+**Status** → Based on `variants[].available` - "active" if available, "draft" if not
+
+## Missing/Manual Fields
+
+These fields are not available in the JSON and need to be:
+- Google Shopping fields (Category, Gender, Age Group, MPN, Condition, Custom Product)
+- Variant Tax Code
+- Cost per item
+- Regional pricing fields (India/International prices)
+- Variant Image (could map to variant-specific images if available)
+
+## Special Considerations
+
+1. Multiple Variants: Each variant becomes a separate CSV row with the same product data
+2. Multiple Images: Additional images need separate rows or be handled differently
+3. Price Conversion: JSON prices appear to be in rupees with decimals (e.g., "645.00")
+4. HTML Unescaping: `body_html` contains escaped HTML (`\u003c` = `<`)
+5. Array Handling: Tags array needs to be comma-separated string
+6. Boolean Conversion: JSON booleans need to become "TRUE"/"FALSE" strings

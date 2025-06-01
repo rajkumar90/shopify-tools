@@ -1,4 +1,4 @@
-.PHONY: server test lint-check lint-fix scrape-products
+.PHONY: server test lint-check lint-fix scrape-products scrape-shopify-json analyze-csv
 
 server:
 	bin/rails server
@@ -25,7 +25,13 @@ db-seed:
 	bin/rails db:seed
 
 db-reset:
-	bin/rails db:drop db:create db:migrate db:seed
+	bin/rails db:drop db:create db:migrate db:seed 
 
 scrape-products:
-	ruby lib/product_scraper.rb 
+	ruby app/helpers/shopify_product_scraper.rb
+
+scrape-shopify-json:
+	ruby app/helpers/shopify_product_scraper.rb
+
+analyze-csv:
+	ruby app/helpers/analyze_csv.rb 
